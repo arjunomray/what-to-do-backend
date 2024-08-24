@@ -1,5 +1,5 @@
 from typing import Annotated, List
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from ..internals.auth import get_current_user
 from ..models.user import User
@@ -13,11 +13,20 @@ router = APIRouter(prefix="/todos")
 
 
 @router.get(path="/{todo_id}")
-async def get_one(todo_id: int):
+async def get_one(
+    todo_id: int,
+    current_user: Annotated[User, Depends(get_current_user)],
+):
     with next(get_session()) as session:
         todo = session.get(Todo, todo_id)
         if not todo:
-            return HTTPException(status_code=404, detail="Did not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Did not found"
+            )
+        if todo.owner != current_user.username:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="Invalid request"
+            )
         return todo
 
 
@@ -26,14 +35,23 @@ async def get_all(
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> List[Todo]:
     with next(get_session()) as session:
-        todo_list = session.exec(select(Todo)).all()
+        todo_list = session.exec(
+            select(Todo).where(Todo.owner == current_user.username)
+        ).all()
+        print(current_user.username)
     return todo_list
 
 
 @router.post(path="/create")
-async def create_one(todo: TodoBase):
+async def create_one(
+    todo: TodoBase,
+    current_user: Annotated[User, Depends(get_current_user)],
+):
     todo = Todo(
-        name=todo.name, is_complete=todo.is_complete, id=random.randint(10000, 1000000)
+        name=todo.name,
+        is_complete=False,
+        id=random.randint(10000, 1000000),
+        owner=current_user.username,
     )
     with next(get_session()) as session:
         session.add(todo)
@@ -43,11 +61,20 @@ async def create_one(todo: TodoBase):
 
 
 @router.delete(path="/delete/{todo_id}")
-async def delete_one(todo_id: int):
+async def delete_one(
+    todo_id: int,
+    current_user: Annotated[User, Depends(get_current_user)],
+):
     with next(get_session()) as session:
         todo = session.get(Todo, todo_id)
         if not todo:
-            return HTTPException(status_code=404, detail="Todo not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Todo not found"
+            )
+        if todo.owner != current_user.username:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="Invalid Request"
+            )
         session.delete(todo)
         session.commit()
         return {"message": f"{todo.name} is deleted"}
