@@ -1,6 +1,10 @@
 from contextlib import asynccontextmanager
+from typing import Annotated
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
+
+from .internals.auth import get_current_user
+from .models.user import User
 from .routers import todo, users
 from .utils.database import init_db
 
@@ -29,5 +33,5 @@ app.include_router(users.router)
 
 
 @app.get(path="/hello/")
-async def index():
-    return {"message": "welcome to todo api"}
+async def index(current_user: Annotated[User, Depends(get_current_user)]):
+    return {"message": "welcome to todo api", "user": current_user}

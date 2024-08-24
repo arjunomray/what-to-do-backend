@@ -1,12 +1,15 @@
-from typing import List
-from fastapi import APIRouter, HTTPException
+from typing import Annotated, List
+from fastapi import APIRouter, Depends, HTTPException
+
+from ..internals.auth import get_current_user
+from ..models.user import User
 from ..models.todo import Todo, TodoBase
 from ..utils.database import get_session
 from sqlmodel import select
 import random
 
 
-router = APIRouter(prefix="/items")
+router = APIRouter(prefix="/todos")
 
 
 @router.get(path="/{todo_id}")
@@ -19,7 +22,9 @@ async def get_one(todo_id: int):
 
 
 @router.get(path="/")
-async def get_all() -> List[Todo]:
+async def get_all(
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> List[Todo]:
     with next(get_session()) as session:
         todo_list = session.exec(select(Todo)).all()
     return todo_list
@@ -46,4 +51,3 @@ async def delete_one(todo_id: int):
         session.delete(todo)
         session.commit()
         return {"message": f"{todo.name} is deleted"}
-

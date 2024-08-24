@@ -1,5 +1,6 @@
 from sqlmodel import SQLModel, Field
 
+
 class TodoBase(SQLModel):
     name: str = Field(index=True)
 

@@ -4,9 +4,10 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jwt.exceptions import InvalidTokenError
 from passlib.context import CryptContext
-from ..schema.users import fake_users_db, get_user
 
 import jwt
+from ..models.user import User
+from ..utils.database import get_session
 from ..schema.token import TokenData
 
 SECRET_KEY = "3fc9506cb095861b2b99ebdf96262e13cf5975599f8889078fea0ef80a17396e"
@@ -14,7 +15,7 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MIN = 30
 
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="users/login")
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -27,8 +28,9 @@ def get_password_hash(password):
     return pwd_context.hash(password)
 
 
-def authenticate_user(fake_db, username: str, password: str):
-    user = get_user(fake_db, username)
+def authenticate_user(username: str, password: str):
+    with next(get_session()) as session:
+        user = session.get(User, username)
     if not user:
         return False
     if not verify_password(password, user.hashed_password):
@@ -62,7 +64,8 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
         token_data = TokenData(username=username)
     except InvalidTokenError:
         raise credentials_exception
-    user = get_user(fake_users_db, username=token_data.username)
+    with next(get_session()) as session:
+        user = session.get(User, token_data.username)
     if not user:
         return credentials_exception
     return user
