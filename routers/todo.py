@@ -60,6 +60,30 @@ async def create_one(
     return todo
 
 
+@router.patch("/update_state/{todo_id}", response_model=Todo)
+async def update_state(
+    todo_id: int, todo: Todo,  current_user: Annotated[User, Depends(get_current_user)]
+):
+    with next(get_session()) as session:
+        stored_todo = session.get(Todo, todo_id)
+        if not stored_todo:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Todo not found"
+            )
+        if stored_todo.owner != current_user.username:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Invalid Request"
+            )
+        stored_todo.is_complete = todo.is_complete
+        stored_todo.name = todo.name
+
+        session.add(stored_todo)
+        session.commit()
+        session.refresh(stored_todo)
+
+        return stored_todo
+
+
 @router.delete(path="/delete/{todo_id}")
 async def delete_one(
     todo_id: int,

@@ -7,6 +7,9 @@ from .internals.auth import get_current_user
 from .models.user import User
 from .routers import todo, users
 from .utils.database import init_db
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 @asynccontextmanager
@@ -34,4 +37,4 @@ app.include_router(users.router)
 
 @app.get(path="/hello/")
 async def index(current_user: Annotated[User, Depends(get_current_user)]):
-    return {"message": "welcome to todo api", "user": current_user}
+    return {"message": "welcome to todo api", "user": current_user.username}
